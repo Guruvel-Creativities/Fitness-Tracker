@@ -31,10 +31,14 @@ button { padding:10px; margin:5px; }
 </div>
 
 <script>
+
 // ================= SETTINGS =================
+// ✅ YOUR SHEET DETAILS
 const SHEET_ID = '1_fubpXNN3EzGVCgGrT8QCJFdXBMb-vrBDs1qyWXL2no';
 const GID = '1576719619';
-const CSV_URL = const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&t=${Date.now()}`;
+
+// ✅ CORRECT CSV URL (FIXED)
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&t=${Date.now()}`;
 
 // ================= GLOBAL =================
 let map, routeLine, startMarker, endMarker;
@@ -50,6 +54,7 @@ function log(msg){
 // ================= MAP =================
 function initMap(){
     map = L.map('map').setView([11.0168, 76.9558], 13);
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
         attribution:'© OpenStreetMap'
     }).addTo(map);
@@ -60,7 +65,7 @@ async function fetchSheetData(){
 
     const filterDate = document.getElementById("dateInput").value;
     if(!filterDate){
-        alert("Select date");
+        alert("Select date first");
         return;
     }
 
@@ -68,7 +73,10 @@ async function fetchSheetData(){
 
     try{
         const res = await fetch(CSV_URL);
-        if(!res.ok) throw new Error("Sheet not accessible");
+
+        if(!res.ok){
+            throw new Error("Sheet not accessible (Check sharing settings)");
+        }
 
         const text = await res.text();
 
@@ -81,7 +89,7 @@ async function fetchSheetData(){
         });
 
     }catch(e){
-        log("ERROR: "+e.message);
+        log("ERROR: " + e.message);
     }
 }
 
@@ -96,32 +104,15 @@ function processData(data, filterDate){
     log("Total rows: " + data.length);
     log("Columns: " + Object.keys(data[0]).join(", "));
 
-    // AUTO DETECT
-    const findCol = (regex) =>
-        Object.keys(data[0]).find(k => regex.test(k)) || null;
+    // ✅ FIXED COLUMN NAMES (MATCH YOUR SHEET)
+    const latKey = "Latitude";
+    const lonKey = "Longitude";
+    const dateKey = "Date";
+    const timeKey = "Time";
 
-    let latKey = findCol(/lat/i);
-    let lonKey = findCol(/lon|lng/i);
-    let dateKey = findCol(/date/i);
-    let timeKey = findCol(/time/i);
-
-    // FALLBACK (edit if needed)
-    latKey = latKey || "Latitude";
-    lonKey = lonKey || "Longitude";
-    dateKey = dateKey || "Date";
-
-    log(`Using: ${latKey}, ${lonKey}, ${dateKey}`);
-
-    // FILTER DATE
+    // ✅ DATE FILTER (SAFE)
     const filtered = data.filter(row=>{
-        const raw = row[dateKey];
-        if(!raw) return false;
-
-        const d = new Date(raw);
-        if(isNaN(d)) return false;
-
-        const formatted = d.toISOString().split('T')[0];
-        return formatted === filterDate;
+        return String(row[dateKey]).trim() === filterDate;
     });
 
     log("Filtered rows: " + filtered.length);
@@ -131,22 +122,20 @@ function processData(data, filterDate){
         return;
     }
 
-    renderRoute(filtered, latKey, lonKey, timeKey);
+    renderRoute(filtered, latKey, lonKey);
 }
 
 // ================= RENDER =================
-function renderRoute(data, latK, lonK, timeK){
+function renderRoute(data, latK, lonK){
 
     let points = [];
 
     data.forEach(row=>{
-        const lat = parseFloat(String(row[latK]).trim());
-        const lon = parseFloat(String(row[lonK]).trim());
+        const lat = Number(row[latK]);
+        const lon = Number(row[lonK]);
 
         if(!isNaN(lat) && !isNaN(lon)){
-            if(lat > 8 && lat < 38){ // India filter
-                points.push([lat, lon]);
-            }
+            points.push([lat, lon]);
         }
     });
 
@@ -162,13 +151,19 @@ function renderRoute(data, latK, lonK, timeK){
         return;
     }
 
-    routeLine = L.polyline(points,{color:"blue", weight:5}).addTo(map);
+    // DRAW ROUTE
+    routeLine = L.polyline(points,{
+        color:"blue",
+        weight:5
+    }).addTo(map);
 
+    // START & END MARKERS
     startMarker = L.marker(points[0]).addTo(map).bindPopup("Start");
     endMarker = L.marker(points[points.length-1]).addTo(map).bindPopup("End");
 
     map.fitBounds(routeLine.getBounds(), {padding:[50,50]});
 
+    // FIX MAP DISPLAY BUG
     setTimeout(()=>map.invalidateSize(),500);
 
     log("Route rendered successfully");
@@ -177,6 +172,8 @@ function renderRoute(data, latK, lonK, timeK){
 // ================= INIT =================
 window.onload = ()=>{
     initMap();
+
+    // AUTO SET TODAY DATE
     document.getElementById("dateInput").value =
         new Date().toISOString().split('T')[0];
 };
