@@ -1,231 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fitness Tracker | Coimbatore Route</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <style>
-        :root { --primary: #667eea; --secondary: #764ba2; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; color: #333; }
-        .header { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 2rem 1rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .container { max-width: 1200px; margin: -20px auto 20px; padding: 0 15px; }
-        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        input[type="date"] { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
-        button { padding: 10px 20px; border: none; border-radius: 6px; background: var(--primary); color: white; cursor: pointer; font-weight: 600; transition: opacity 0.2s; }
-        button:hover { opacity: 0.9; }
-        #map { height: 500px; width: 100%; border-radius: 12px; z-index: 1; border: 4px solid white; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-box { background: white; padding: 15px; border-radius: 10px; text-align: center; border-bottom: 4px solid var(--primary); }
-        .stat-box small { color: #777; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1px; }
-        .stat-box div { font-size: 1.4rem; font-weight: bold; margin-top: 5px; }
-        #debug-log { background: #222; color: #0f0; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.8rem; height: 150px; overflow-y: auto; margin-top: 20px; }
-        .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-        th { background: #f8f9fa; color: var(--primary); }
-        .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 10000; justify-content: center; align-items: center; flex-direction: column; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitness Tracker</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<style>
+body { font-family: Arial; background:#f5f5f5; }
+.container { max-width:1200px; margin:auto; }
+#map { height:500px; margin-top:20px; border-radius:10px; }
+#debug { background:#111; color:#0f0; padding:10px; height:150px; overflow:auto; font-size:12px;}
+button { padding:10px; margin:5px; }
+</style>
 </head>
+
 <body>
 
-<div class="loading-overlay" id="loader">
-    <div style="font-size: 2rem; margin-bottom: 10px;">📡</div>
-    <div>Connecting to Google Sheets...</div>
-</div>
-
-<div class="header">
-    <h1>Fitness Tracker</h1>
-    <p>Guruvel Creativities - Coimbatore</p>
-</div>
-
 <div class="container">
-    <div class="card controls">
-        <label>Select Date:</label>
-        <input type="date" id="dateInput">
-        <button onclick="fetchSheetData()">🗺️ Load Route</button>
-        <button onclick="location.reload()" style="background:#666">🔄 Reset</button>
-    </div>
+<h2>Fitness Tracker</h2>
 
-    <div class="stats-grid">
-        <div class="stat-box"><small>Total Distance</small><div id="stat-dist">0.00 km</div></div>
-        <div class="stat-box"><small>Max Speed</small><div id="stat-speed">0.0 km/h</div></div>
-        <div class="stat-box"><small>Data Points</small><div id="stat-points">0</div></div>
-    </div>
+<input type="date" id="dateInput">
+<button onclick="fetchSheetData()">Load Route</button>
 
-    <div id="map"></div>
-
-    <div class="card table-wrap">
-        <h3>Route Details</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Latitude</th>
-                    <th>Longitude</th>
-                    <th>Distance</th>
-                    <th>Speed</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody">
-                <tr><td colspan="5" style="text-align:center">No data loaded. Select a date and click Load.</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div id="debug-log">
-        > System Ready. Waiting for user input...<br>
-    </div>
+<div id="map"></div>
+<div id="debug">> Ready...<br></div>
 </div>
 
 <script>
-    // --- SETTINGS ---
-    const SHEET_ID = '2PACX-1vTWm5aTQ5LCqkYJXMrengrw0ES1RdeT-TurNXTWVejFFmK9rSmt0ekKCY_DnLOS3wDegMU9OOs3w5gc';
-    const GID = '86938637';
-    // Adding a timestamp to the URL avoids browser caching issues
-    const CSV_URL = `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=${GID}&single=true&output=csv&t=${Date.now()}`;
+// ================= SETTINGS =================
+const SHEET_ID = '2PACX-1vTWm5aTQ5LCqkYJXMrengrw0ES1RdeT-TurNXTWVejFFmK9rSmt0ekKCY_DnLOS3wDegMU9OOs3w5gc';
+const GID = '86938637';
+const CSV_URL = `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=${GID}&single=true&output=csv&t=${Date.now()}`;
 
-    let map, routeLine, startMarker, endMarker;
+// ================= GLOBAL =================
+let map, routeLine, startMarker, endMarker;
 
-    function log(msg) {
-        const logger = document.getElementById('debug-log');
-        logger.innerHTML += `> ${msg}<br>`;
-        logger.scrollTop = logger.scrollHeight;
+// ================= LOGGER =================
+function log(msg){
+    const d = document.getElementById("debug");
+    d.innerHTML += "> " + msg + "<br>";
+    d.scrollTop = d.scrollHeight;
+    console.log(msg);
+}
+
+// ================= MAP =================
+function initMap(){
+    map = L.map('map').setView([11.0168, 76.9558], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© OpenStreetMap'
+    }).addTo(map);
+}
+
+// ================= FETCH =================
+async function fetchSheetData(){
+
+    const filterDate = document.getElementById("dateInput").value;
+    if(!filterDate){
+        alert("Select date");
+        return;
     }
 
-    function initMap() {
-        log("Initializing Map...");
-        map = L.map('map').setView([11.0168, 76.9558], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-    }
+    log("Fetching CSV...");
 
-    async function fetchSheetData() {
-        const filterDate = document.getElementById('dateInput').value;
-        if (!filterDate) return alert("Please select a date first!");
+    try{
+        const res = await fetch(CSV_URL);
+        if(!res.ok) throw new Error("Sheet not accessible");
 
-        document.getElementById('loader').style.display = 'flex';
-        log(`Fetching CSV for date: ${filterDate}...`);
+        const text = await res.text();
 
-        try {
-            const response = await fetch(CSV_URL);
-            if (!response.ok) throw new Error("Could not reach Google Sheets. Is it Published to Web?");
-            
-            const csvText = await response.text();
-            
-            Papa.parse(csvText, {
-                header: true,
-                skipEmptyLines: true,
-                dynamicTyping: true,
-                complete: function(results) {
-                    processData(results.data, filterDate);
-                    document.getElementById('loader').style.display = 'none';
-                },
-                error: function(err) {
-                    log("ERROR: CSV Parsing failed: " + err);
-                    document.getElementById('loader').style.display = 'none';
-                }
-            });
-        } catch (error) {
-            log("CRITICAL ERROR: " + error.message);
-            alert(error.message);
-            document.getElementById('loader').style.display = 'none';
-        }
-    }
-
-    function processData(rawData, filterDate) {
-        log(`Found ${rawData.length} total rows in Sheet.`);
-        
-        // AUTO-DETECT COLUMNS (Matches "Lat", "LATITUDE", "lat_val", etc.)
-        const findCol = (regex) => Object.keys(rawData[0]).find(key => regex.test(key));
-        
-        const latKey = findCol(/lat/i);
-        const lonKey = findCol(/lon|lng/i);
-        const dateKey = findCol(/date/i);
-        const timeKey = findCol(/time/i);
-        const distKey = findCol(/dist/i);
-        const speedKey = findCol(/speed/i);
-
-        log(`Detected Columns: Lat[${latKey}], Lon[${lonKey}], Date[${dateKey}]`);
-
-        // Filter by Date
-        const filtered = rawData.filter(row => {
-            const val = row[dateKey]?.toString() || "";
-            return val.includes(filterDate);
-        });
-
-        if (filtered.length === 0) {
-            log(`❌ No data matches date: ${filterDate}`);
-            return alert("No data found for this date. Check the Debug Log for column names.");
-        }
-
-        log(`✅ Filtered ${filtered.length} points for ${filterDate}.`);
-        renderUI(filtered, latKey, lonKey, timeKey, distKey, speedKey);
-    }
-
-    function renderUI(data, latK, lonK, timeK, distK, speedK) {
-        const points = [];
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = '';
-        
-        let maxSpeed = 0;
-        let totalDist = 0;
-
-        data.forEach(row => {
-            const lat = parseFloat(row[latK]);
-            const lon = parseFloat(row[lonK]);
-
-            // Only plot if inside India region (prevents 0,0 jumps)
-            if (!isNaN(lat) && !isNaN(lon) && lat > 8 && lat < 38) {
-                points.push([lat, lon]);
-                
-                const speed = parseFloat(row[speedK]) || 0;
-                if (speed > maxSpeed) maxSpeed = speed;
-                totalDist = parseFloat(row[distK]) || totalDist;
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row[timeK] || '-'}</td>
-                    <td>${lat.toFixed(5)}</td>
-                    <td>${lon.toFixed(5)}</td>
-                    <td>${(parseFloat(row[distK]) || 0).toFixed(2)} km</td>
-                    <td>${speed.toFixed(1)} km/h</td>
-                `;
-                tbody.appendChild(tr);
+        Papa.parse(text,{
+            header:true,
+            skipEmptyLines:true,
+            complete:(result)=>{
+                processData(result.data, filterDate);
             }
         });
 
-        // Update Text Stats
-        document.getElementById('stat-dist').innerText = totalDist.toFixed(2) + " km";
-        document.getElementById('stat-speed').innerText = maxSpeed.toFixed(1) + " km/h";
-        document.getElementById('stat-points').innerText = points.length;
+    }catch(e){
+        log("ERROR: "+e.message);
+    }
+}
 
-        // Reset Map Layers
-        if (routeLine) map.removeLayer(routeLine);
-        if (startMarker) map.removeLayer(startMarker);
-        if (endMarker) map.removeLayer(endMarker);
+// ================= PROCESS =================
+function processData(data, filterDate){
 
-        if (points.length > 0) {
-            routeLine = L.polyline(points, { color: '#667eea', weight: 6, opacity: 0.8 }).addTo(map);
-            startMarker = L.circleMarker(points[0], {radius: 8, color: 'green', fillOpacity: 1}).addTo(map).bindPopup("Start");
-            endMarker = L.circleMarker(points[points.length-1], {radius: 8, color: 'red', fillOpacity: 1}).addTo(map).bindPopup("End");
-            
-            map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
-            log("Map rendering complete.");
-        } else {
-            log("Warning: No valid GPS coordinates found in filtered data.");
-        }
+    if(!data || data.length === 0){
+        log("No data found");
+        return;
     }
 
-    window.onload = () => {
-        initMap();
-        document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
-    };
+    log("Total rows: " + data.length);
+    log("Columns: " + Object.keys(data[0]).join(", "));
+
+    // AUTO DETECT
+    const findCol = (regex) =>
+        Object.keys(data[0]).find(k => regex.test(k)) || null;
+
+    let latKey = findCol(/lat/i);
+    let lonKey = findCol(/lon|lng/i);
+    let dateKey = findCol(/date/i);
+    let timeKey = findCol(/time/i);
+
+    // FALLBACK (edit if needed)
+    latKey = latKey || "Latitude";
+    lonKey = lonKey || "Longitude";
+    dateKey = dateKey || "Date";
+
+    log(`Using: ${latKey}, ${lonKey}, ${dateKey}`);
+
+    // FILTER DATE
+    const filtered = data.filter(row=>{
+        const raw = row[dateKey];
+        if(!raw) return false;
+
+        const d = new Date(raw);
+        if(isNaN(d)) return false;
+
+        const formatted = d.toISOString().split('T')[0];
+        return formatted === filterDate;
+    });
+
+    log("Filtered rows: " + filtered.length);
+
+    if(filtered.length === 0){
+        alert("No data for selected date");
+        return;
+    }
+
+    renderRoute(filtered, latKey, lonKey, timeKey);
+}
+
+// ================= RENDER =================
+function renderRoute(data, latK, lonK, timeK){
+
+    let points = [];
+
+    data.forEach(row=>{
+        const lat = parseFloat(String(row[latK]).trim());
+        const lon = parseFloat(String(row[lonK]).trim());
+
+        if(!isNaN(lat) && !isNaN(lon)){
+            if(lat > 8 && lat < 38){ // India filter
+                points.push([lat, lon]);
+            }
+        }
+    });
+
+    log("Valid points: " + points.length);
+
+    // CLEAR OLD
+    if(routeLine) map.removeLayer(routeLine);
+    if(startMarker) map.removeLayer(startMarker);
+    if(endMarker) map.removeLayer(endMarker);
+
+    if(points.length === 0){
+        log("No valid GPS points");
+        return;
+    }
+
+    routeLine = L.polyline(points,{color:"blue", weight:5}).addTo(map);
+
+    startMarker = L.marker(points[0]).addTo(map).bindPopup("Start");
+    endMarker = L.marker(points[points.length-1]).addTo(map).bindPopup("End");
+
+    map.fitBounds(routeLine.getBounds(), {padding:[50,50]});
+
+    setTimeout(()=>map.invalidateSize(),500);
+
+    log("Route rendered successfully");
+}
+
+// ================= INIT =================
+window.onload = ()=>{
+    initMap();
+    document.getElementById("dateInput").value =
+        new Date().toISOString().split('T')[0];
+};
+
 </script>
 
 </body>
