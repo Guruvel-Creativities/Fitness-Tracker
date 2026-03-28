@@ -7,6 +7,8 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- ✅ FIXED CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
 <style>
@@ -33,12 +35,9 @@ button { padding:10px; margin:5px; }
 <script>
 
 // ================= SETTINGS =================
-// ✅ YOUR SHEET DETAILS
-const SHEET_ID = '1_fubpXNN3EzGVCgGrT8QCJFdXBMb-vrBDs1qyWXL2no';
-const GID = '1576719619';
 
-// ✅ CORRECT CSV URL (FIXED)
-const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&t=${Date.now()}`;
+// ✅ YOUR FINAL WORKING CSV (PUBLISHED)
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWm5aTQ5LCqkYJXMrengrw0ES1RdeT-TurNXTWVejFFmK9rSmt0ekKCY_DnLOS3wDegMU9OOs3w5gc/pub?gid=1576719619&single=true&output=csv";
 
 // ================= GLOBAL =================
 let map, routeLine, startMarker, endMarker;
@@ -75,7 +74,7 @@ async function fetchSheetData(){
         const res = await fetch(CSV_URL);
 
         if(!res.ok){
-            throw new Error("Sheet not accessible (Check sharing settings)");
+            throw new Error("Sheet not accessible");
         }
 
         const text = await res.text();
@@ -104,13 +103,12 @@ function processData(data, filterDate){
     log("Total rows: " + data.length);
     log("Columns: " + Object.keys(data[0]).join(", "));
 
-    // ✅ FIXED COLUMN NAMES (MATCH YOUR SHEET)
+    // ✅ FIXED COLUMN NAMES
     const latKey = "Latitude";
     const lonKey = "Longitude";
     const dateKey = "Date";
-    const timeKey = "Time";
 
-    // ✅ DATE FILTER (SAFE)
+    // ✅ FILTER DATE
     const filtered = data.filter(row=>{
         return String(row[dateKey]).trim() === filterDate;
     });
@@ -163,7 +161,6 @@ function renderRoute(data, latK, lonK){
 
     map.fitBounds(routeLine.getBounds(), {padding:[50,50]});
 
-    // FIX MAP DISPLAY BUG
     setTimeout(()=>map.invalidateSize(),500);
 
     log("Route rendered successfully");
@@ -173,7 +170,6 @@ function renderRoute(data, latK, lonK){
 window.onload = ()=>{
     initMap();
 
-    // AUTO SET TODAY DATE
     document.getElementById("dateInput").value =
         new Date().toISOString().split('T')[0];
 };
