@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness Tracker - Route Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .date-selector {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .date-selector label {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .date-selector input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .date-selector button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 14px;
+        }
+        
+        .date-selector button:hover {
+            background: #5a67d8;
+        }
+        
+        .refresh-btn {
+            background: #48bb78 !important;
+        }
+        
+        .refresh-btn:hover {
+            background: #38a169 !important;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        #map {
+            height: 500px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .data-table {
+            background: white;
+            border-radius: 10px;
+            overflow-x: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .data-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .data-table th {
+            background: #f7f7f7;
+            color: #667eea;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        
+        .data-table tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            font-size: 1.2em;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            border-radius: 10px;
+            z-index: 1000;
+        }
+        
+        .error-message {
+            background: #fc8181;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .info-message {
+            background: #4299e1;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏃 Fitness Tracker Route Map</h1>
+            <p>View your running/walking routes on the map | Data from Google Sheets</p>
+        </div>
+        
+        <div class="date-selector">
+            <label for="date">📅 Select Date:</label>
+            <input type="date" id="date">
+            <button onclick="loadData()">🗺️ Load Route</button>
+            <button onclick="refreshData()" class="refresh-btn">🔄 Refresh</button>
+            <button onclick="exportAsGeoJSON()">📥 Export as GeoJSON</button>
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <h3>Total Distance</h3>
+                <div class="value" id="totalDistance">0 km</div>
+            </div>
+            <div class="stat-card">
+                <h3>Max Speed</h3>
+                <div class="value" id="maxSpeed">0 km/h</div>
+            </div>
+            <div class="stat-card">
+                <h3>Duration</h3>
+                <div class="value" id="duration">0 min</div>
+            </div>
+            <div class="stat-card">
+                <h3>Data Points</h3>
+                <div class="value" id="points">0</div>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="data-table">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Latitude</th>
+                        <th>Longitude</th>
+                        <th>Distance (km)</th>
+                        <th>Target (km)</th>
+                        <th>Speed (km/h)</th>
+                        <th>Altitude (m)</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="7" style="text-align: center;">📊 Select a date and click "Load Route" to view data</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // ============================================
+        // CONFIGURATION - YOUR PUBLISHED GOOGLE SHEET
+        // ============================================
+        
+        // Your published Google Sheet ID from the URL
+        const GOOGLE_SHEET_ID = '2PACX-1vTWm5aTQ5LCqkYJXMrengrw0ES1RdeT-TurNXTWVejFFmK9rSmt0ekKCY_DnLOS3wDegMU9OOs3w5gc';
+        
+        // The sheet GID from your URL (the number after ?gid=)
+        const SHEET_GID = '86938637';
+        
+        // Map configuration
+        const MAP_CONFIG = {
+            center: [20, 0],      // Default center
+            zoom: 13,              // Default zoom level
+            routeColor: '#667eea', // Route line color
+            routeWeight: 3,        // Line thickness
+            routeOpacity: 0.7      // Line opacity
+        };
+        
+        // Auto-refresh settings
+        const AUTO_REFRESH = false;      // Set to true to auto-refresh
+        const REFRESH_INTERVAL = 30000;  // 30 seconds
+        
+        // ============================================
+        // END OF CONFIGURATION
+        // ============================================
+        
+        let map;
+        let currentLayer;
+        let refreshTimer;
+        let currentData = [];
+        
+        // Get the CSV URL for your published sheet
+        function getSheetCSVUrl() {
+            return `https://docs.google.com/spreadsheets/d/e/${GOOGLE_SHEET_ID}/pub?gid=${SHEET_GID}&single=true&output=csv`;
+        }
+        
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView(MAP_CONFIG.center, MAP_CONFIG.zoom);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+        }
+        
+        // Main function to load data from Google Sheets
+        async function loadData() {
+            const date = document.getElementById('date').value;
+            if (!date) {
+                showMessage('Please select a date first', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const csvUrl = getSheetCSVUrl();
+                console.log('Loading data from:', csvUrl);
+                
+                const response = await fetch(csvUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const csvText = await response.text();
+                
+                // Check if CSV is empty
+                if (!csvText.trim()) {
+                    throw new Error('CSV file is empty');
+                }
+                
+                // Parse CSV with PapaParse
+                const parsed = Papa.parse(csvText, { 
+                    header: true, 
+                    skipEmptyLines: true,
+                    dynamicTyping: true
+                });
+                
+                if (parsed.errors.length > 0) {
+                    console.warn('CSV parsing warnings:', parsed.errors);
+                }
+                
+                let data = parsed.data;
+                
+                if (!data || data.length === 0) {
+                    showMessage('No data found in the sheet', 'error');
+                    showNoDataMessage();
+                    return;
+                }
+                
+                // Log column names for debugging
+                console.log('CSV Headers:', Object.keys(data[0]));
+                console.log('Sample data (first row):', data[0]);
+                console.log('Total rows:', data.length);
+                
+                // Try different possible date column names
+                const dateColumn = findDateColumn(data[0]);
+                if (!dateColumn) {
+                    console.error('Available columns:', Object.keys(data[0]));
+                    showMessage('Could not find date column. Available: ' + Object.keys(data[0]).join(', '), 'error');
+                    return;
+                }
+                
+                console.log('Using date column:', dateColumn);
+                
+                // Filter data by selected date
+                const filteredData = data.filter(row => {
+                    const rowDate = row[dateColumn];
+                    if (!rowDate) return false;
+                    
+                    // Handle different date formats
+                    let rowDateStr = rowDate.toString();
+                    if (rowDateStr.includes(' ')) {
+                        rowDateStr = rowDateStr.split(' ')[0];
+                    }
+                    return rowDateStr === date;
+                });
+                
+                console.log(`Found ${filteredData.length} records for date ${date}`);
+                
+                if (filteredData.length === 0) {
+                    showMessage(`No data found for ${date}. Try another date.`, 'info');
+                    showNoDataMessage();
+                    return;
+                }
+                
+                currentData = filteredData;
+                updateStats(filteredData);
+                updateTable(filteredData);
+                updateMap(filteredData);
+                showMessage(`Loaded ${filteredData.length} data points for ${date}`, 'info');
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                let errorMsg = error.message;
+                if (error.message.includes('Failed to fetch')) {
+                    errorMsg = 'Cannot access Google Sheet. Make sure the sheet is published as CSV. Go to File → Share → Publish to web → Select "CSV" format.';
+                }
+                showMessage(errorMsg, 'error');
+                showNoDataMessage();
+            }
+            
+            showLoading(false);
+        }
+        
+        // Find the date column in the data
+        function findDateColumn(sampleRow) {
+            const possibleDateColumns = ['Date', 'date', 'DATE', 'Timestamp', 'timestamp', 'Day', 'day'];
+            for (const col of possibleDateColumns) {
+                if (sampleRow.hasOwnProperty(col)) {
+                    return col;
+                }
+            }
+            // If no standard date column found, check all columns
+            for (const key in sampleRow) {
+                if (key.toLowerCase().includes('date') || key.toLowerCase().includes('time')) {
+                    return key;
+                }
+            }
+            return null;
+        }
+        
+        // Update statistics cards
+        function updateStats(data) {
+            // Get the distance column name
+            const distanceCol = findDistanceColumn(data[0]);
+            const speedCol = findSpeedColumn(data[0]);
+            
+            // Calculate total distance
+            let totalDist = 0;
+            if (distanceCol && data[data.length - 1][distanceCol]) {
+                totalDist = parseFloat(data[data.length - 1][distanceCol]) || 0;
+            }
+            document.getElementById('totalDistance').innerHTML = totalDist.toFixed(2) + ' km';
+            
+            // Calculate max speed
+            let maxSpeed = 0;
+            if (speedCol) {
+                data.forEach(row => {
+                    const speed = parseFloat(row[speedCol]) || 0;
+                    if (speed > maxSpeed) maxSpeed = speed;
+                });
+            }
+            document.getElementById('maxSpeed').innerHTML = maxSpeed.toFixed(1) + ' km/h';
+            
+            // Calculate duration (assuming 5-second intervals)
+            const duration = (data.length - 1) * 5;
+            const minutes = Math.floor(duration / 60);
+            document.getElementById('duration').innerHTML = minutes + ' min';
+            
+            // Count points
+            document.getElementById('points').innerHTML = data.length;
+        }
+        
+        // Find column names
+        function findDistanceColumn(sampleRow) {
+            const possibleCols = ['Distance (km)', 'Distance', 'distance', 'Dist', 'dist'];
+            for (const col of possibleCols) {
+                if (sampleRow.hasOwnProperty(col)) {
+                    return col;
+                }
+            }
+            return null;
+        }
+        
+        function findSpeedColumn(sampleRow) {
+            const possibleCols = ['Speed (km/h)', 'Speed', 'speed', 'Velocity'];
+            for (const col of possibleCols) {
+                if (sampleRow.hasOwnProperty(col)) {
+                    return col;
+                }
+            }
+            return null;
+        }
+        
+        function findLatColumn(sampleRow) {
+            const possibleCols = ['Latitude', 'Lat', 'lat', 'latitude'];
+            for (const col of possibleCols) {
+                if (sampleRow.hasOwnProperty(col)) {
+                    return col;
+                }
+            }
+            return null;
+        }
+        
+        function findLonColumn(sampleRow) {
+            const possibleCols = ['Longitude', 'Lon', 'lon', 'longitude', 'Lng', 'lng'];
+            for (const col of possibleCols) {
+                if (sampleRow.hasOwnProperty(col)) {
+                    return col;
+                }
+            }
+            return null;
+        }
+        
+        function findTimeColumn(sampleRow) {
+            const possibleCols = ['Time', 'time', 'Timestamp', 'timestamp', 'Hour'];
+            for (const col of possibleCols) {
+                if (sampleRow.hasOwnProperty(col)) {
+                    return col;
+                }
+            }
+            return null;
+        }
+        
+        function findAltitudeColumn(sampleRow) {
+            const possibleCols = ['Altitude', 'altitude', 'Alt', 'alt', 'Elevation'];
+            for (const col of possibleCols) {
+                if (sampleRow.hasOwnProperty(col)) {
+                    return col;
+                }
+            }
+            return null;
+        }
+        
+        // Update data table
+        function updateTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No data available</td></tr>';
+                return;
+            }
+            
+            const sampleRow = data[0];
+            const timeCol = findTimeColumn(sampleRow);
+            const latCol = findLatColumn(sampleRow);
+            const lonCol = findLonColumn(sampleRow);
+            const distCol = findDistanceColumn(sampleRow);
+            const speedCol = findSpeedColumn(sampleRow);
+            const altCol = findAltitudeColumn(sampleRow);
+            
+            data.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                const time = timeCol ? (row[timeCol] || 'N/A') : 'N/A';
+                const lat = latCol ? parseFloat(row[latCol] || 0) : 0;
+                const lon = lonCol ? parseFloat(row[lonCol] || 0) : 0;
+                const distance = distCol ? parseFloat(row[distCol] || 0) : 0;
+                const target = row['Target (km)'] || row['Target'] || 'N/A';
+                const speed = speedCol ? parseFloat(row[speedCol] || 0) : 0;
+                const altitude = altCol ? parseFloat(row[altCol] || 0) : 0;
+                
+                tr.innerHTML = `
+                    <td>${time}</td>
+                    <td>${lat.toFixed(6)}</td>
+                    <td>${lon.toFixed(6)}</td>
+                    <td>${distance.toFixed(3)}</td>
+                    <td>${typeof target === 'number' ? target.toFixed(1) : target}</td>
+                    <td>${speed.toFixed(1)}</td>
+                    <td>${altitude.toFixed(0)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // Update map with route
+        function updateMap(data) {
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+            }
+            
+            const sampleRow = data[0];
+            const latCol = findLatColumn(sampleRow);
+            const lonCol = findLonColumn(sampleRow);
+            
+            if (!latCol || !lonCol) {
+                console.error('Cannot find latitude/longitude columns');
+                showMessage('Latitude/Longitude columns not found in data', 'error');
+                return;
+            }
+            
+            const points = [];
+            data.forEach(row => {
+                const lat = parseFloat(row[latCol]);
+                const lon = parseFloat(row[lonCol]);
+                if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+                    points.push([lat, lon]);
+                }
+            });
+            
+            if (points.length === 0) {
+                showMessage('No valid GPS coordinates found', 'error');
+                return;
+            }
+            
+            // Add polyline for the route
+            currentLayer = L.polyline(points, {
+                color: MAP_CONFIG.routeColor,
+                weight: MAP_CONFIG.routeWeight,
+                opacity: MAP_CONFIG.routeOpacity
+            }).addTo(map);
+            
+            // Add markers for start and end
+            if (points.length > 0) {
+                // Start marker
+                const startIcon = L.divIcon({
+                    html: '<div style="font-size: 24px;">🏁</div>',
+                    iconSize: [30, 30],
+                    className: 'custom-marker'
+                });
+                L.marker(points[0], { icon: startIcon })
+                    .addTo(map)
+                    .bindPopup('<b>Start Point</b><br>Start of your journey');
+                
+                // End marker
+                const endIcon = L.divIcon({
+                    html: '<div style="font-size: 24px;">🏆</div>',
+                    iconSize: [30, 30],
+                    className: 'custom-marker'
+                });
+                L.marker(points[points.length - 1], { icon: endIcon })
+                    .addTo(map)
+                    .bindPopup('<b>End Point</b><br>End of your journey');
+                
+                // Add distance markers at key points
+                const distCol = findDistanceColumn(sampleRow);
+                points.forEach((point, idx) => {
+                    if (idx > 0 && idx < points.length - 1 && idx % Math.floor(points.length / 5) === 0) {
+                        const distance = distCol ? parseFloat(data[idx][distCol] || 0) : 0;
+                        L.marker(point, {
+                            icon: L.divIcon({
+                                html: `<div style="font-size: 16px; background: white; border-radius: 50%; padding: 5px;">📍</div>`,
+                                iconSize: [25, 25]
+                            })
+                        }).addTo(map).bindPopup(`<b>Waypoint</b><br>Distance: ${distance.toFixed(2)} km`);
+                    }
+                });
+            }
+            
+            // Fit bounds to show the entire route
+            const bounds = L.latLngBounds(points);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+        
+        // Refresh data (reload from sheet)
+        async function refreshData() {
+            await loadData();
+        }
+        
+        // Show no data message
+        function showNoDataMessage() {
+            document.getElementById('totalDistance').innerHTML = '0 km';
+            document.getElementById('maxSpeed').innerHTML = '0 km/h';
+            document.getElementById('duration').innerHTML = '0 min';
+            document.getElementById('points').innerHTML = '0';
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="text-align: center;">📭 No data available for selected date</td></tr>';
+            
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+            }
+        }
+        
+        // Show loading indicator
+        function showLoading(show) {
+            let loadingDiv = document.getElementById('loading');
+            if (show) {
+                if (!loadingDiv) {
+                    const div = document.createElement('div');
+                    div.id = 'loading';
+                    div.className = 'loading';
+                    div.innerHTML = '<div class="spinner"></div>Loading data from Google Sheets...';
+                    document.body.appendChild(div);
+                } else {
+                    loadingDiv.style.display = 'block';
+                }
+            } else if (loadingDiv) {
+                loadingDiv.style.display = 'none';
+            }
+        }
+        
+        // Show message to user
+        function showMessage(message, type) {
+            const existingMsg = document.querySelector('.error-message, .info-message');
+            if (existingMsg) existingMsg.remove();
+            
+            const msgDiv = document.createElement('div');
+            msgDiv.className = type === 'error' ? 'error-message' : 'info-message';
+            msgDiv.innerHTML = message;
+            msgDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 400px;';
+            
+            document.body.appendChild(msgDiv);
+            
+            setTimeout(() => {
+                msgDiv.remove();
+            }, 5000);
+        }
+        
+        // Export current data as GeoJSON
+        function exportAsGeoJSON() {
+            if (currentData.length === 0) {
+                showMessage('No data to export', 'error');
+                return;
+            }
+            
+            const sampleRow = currentData[0];
+            const latCol = findLatColumn(sampleRow);
+            const lonCol = findLonColumn(sampleRow);
+            
+            const features = [];
+            currentData.forEach((row, idx) => {
+                const lat = parseFloat(row[latCol]);
+                const lon = parseFloat(row[lonCol]);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    features.push({
+                        type: "Feature",
+                        geometry: {
+                            type: "Point",
+                            coordinates: [lon, lat]
+                        },
+                        properties: {
+                            index: idx,
+                            time: row.Time || row.time || 'N/A',
+                            distance: parseFloat(row['Distance (km)'] || 0),
+                            speed: parseFloat(row['Speed (km/h)'] || 0)
+                        }
+                    });
+                }
+            });
+            
+            const geoJSON = {
+                type: "FeatureCollection",
+                features: features
+            };
+            
+            const dataStr = JSON.stringify(geoJSON, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `fitness_data_${document.getElementById('date').value}.geojson`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showMessage('GeoJSON file downloaded', 'info');
+        }
+        
+        // Setup auto-refresh
+        function setupAutoRefresh() {
+            if (AUTO_REFRESH) {
+                if (refreshTimer) clearInterval(refreshTimer);
+                refreshTimer = setInterval(() => {
+                    if (document.getElementById('date').value) {
+                        loadData();
+                    }
+                }, REFRESH_INTERVAL);
+            }
+        }
+        
+        // Initialize on page load
+        window.onload = () => {
+            initMap();
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date').value = today;
+            // Load data for today
+            loadData();
+            // Setup auto-refresh
+            setupAutoRefresh();
+        };
+    </script>
+</body>
+</html>
