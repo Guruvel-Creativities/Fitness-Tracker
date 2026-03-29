@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fitness Tracker - Route Map</title>
+<title>Fitness Tracker - Route Map with Points</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -53,7 +53,7 @@ body {
     font-size: 0.9em;
 }
 
-.date-selector {
+.controls {
     background: white;
     padding: 20px;
     border-radius: 10px;
@@ -65,19 +65,19 @@ body {
     flex-wrap: wrap;
 }
 
-.date-selector label {
+.controls label {
     font-weight: bold;
     color: #333;
 }
 
-.date-selector input {
+.controls input {
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 5px;
     font-size: 14px;
 }
 
-.date-selector button {
+.controls button {
     background: #667eea;
     color: white;
     border: none;
@@ -88,20 +88,38 @@ body {
     font-size: 14px;
 }
 
-.date-selector button:hover {
+.controls button:hover {
     background: #5a67d8;
+}
+
+.toggle-buttons {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.toggle-btn {
+    background: #e2e8f0;
+    color: #4a5568;
+    padding: 8px 15px;
+    font-size: 12px;
+}
+
+.toggle-btn.active {
+    background: #667eea;
+    color: white;
 }
 
 .stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 20px;
     margin-bottom: 20px;
 }
 
 .stat-card {
     background: white;
-    padding: 20px;
+    padding: 15px;
     border-radius: 10px;
     text-align: center;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -115,13 +133,13 @@ body {
 .stat-card h3 {
     color: #667eea;
     margin-bottom: 10px;
-    font-size: 0.9em;
+    font-size: 0.85em;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .stat-card .value {
-    font-size: 2em;
+    font-size: 1.8em;
     font-weight: bold;
     color: #333;
 }
@@ -132,13 +150,12 @@ body {
 }
 
 #map {
-    height: 500px;
+    height: 550px;
     border-radius: 10px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     margin-bottom: 20px;
 }
 
-/* Custom zoom control position */
 .leaflet-control-zoom {
     border: none !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
@@ -164,29 +181,6 @@ body {
     z-index: 1000;
 }
 
-.error-message {
-    background: #fc8181;
-    color: white;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-.info-message {
-    background: #4299e1;
-    color: white;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
 .spinner {
     border: 3px solid rgba(255,255,255,0.3);
     border-radius: 50%;
@@ -196,6 +190,54 @@ body {
     animation: spin 1s linear infinite;
     margin: 0 auto 10px;
 }
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Custom marker styles */
+.gps-marker {
+    background: transparent;
+    border: none;
+}
+
+.gps-marker div {
+    font-size: 10px;
+    text-align: center;
+    line-height: 1;
+}
+
+.point-marker {
+    background: #667eea;
+    border: 2px solid white;
+    border-radius: 50%;
+    width: 8px;
+    height: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.point-marker:hover {
+    transform: scale(1.5);
+    background: #764ba2;
+    cursor: pointer;
+}
+
+/* Info panel */
+.info-panel {
+    background: white;
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.info-panel h4 {
+    color: #667eea;
+    margin-bottom: 5px;
+}
 </style>
 </head>
 
@@ -204,16 +246,21 @@ body {
 <div class="container">
     <div class="header">
         <h1>🏃 Fitness Tracker Route Map</h1>
-        <p>View your running/walking routes on the map</p>
+        <p>Each dot represents a GPS reading point on your route</p>
         <div class="location-badge">
             📍 Coimbatore, Tamil Nadu, India
         </div>
     </div>
     
-    <div class="date-selector">
+    <div class="controls">
         <label for="dateInput">📅 Select Date:</label>
         <input type="date" id="dateInput">
         <button onclick="fetchSheetData()">🗺️ Load Route</button>
+        
+        <div class="toggle-buttons">
+            <button id="togglePointsBtn" class="toggle-btn active" onclick="togglePoints()">🔘 Show Points</button>
+            <button id="toggleLabelsBtn" class="toggle-btn" onclick="toggleLabels()">🏷️ Show Labels</button>
+        </div>
     </div>
     
     <div class="stats" id="stats">
@@ -243,7 +290,7 @@ body {
             <div class="unit">min</div>
         </div>
         <div class="stat-card">
-            <h3>Data Points</h3>
+            <h3>GPS Points</h3>
             <div class="value" id="dataPoints">0</div>
             <div class="unit">records</div>
         </div>
@@ -259,17 +306,18 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWm5aTQ5LCqkYJ
 
 // ================= GLOBAL =================
 let map, routeLine, startMarker, endMarker;
+let allPointMarkers = [];  // Store all point markers
+let showPoints = true;      // Toggle point visibility
+let showLabels = false;     // Toggle label visibility
 
 // ================= MAP INIT =================
 function initMap(){
-    map = L.map('map').setView([11.0168, 76.9558], 15);
+    map = L.map('map').setView([11.0168, 76.9558], 16);
     
-    // Add zoom control with custom position (top-right is default)
     L.control.zoom({
         position: 'topright'
     }).addTo(map);
     
-    // Add scale bar
     L.control.scale({
         metric: true,
         imperial: false,
@@ -282,6 +330,39 @@ function initMap(){
     }).addTo(map);
 }
 
+// ================= TOGGLE FUNCTIONS =================
+function togglePoints() {
+    showPoints = !showPoints;
+    const btn = document.getElementById('togglePointsBtn');
+    
+    allPointMarkers.forEach(marker => {
+        if (showPoints) {
+            marker.addTo(map);
+        } else {
+            marker.remove();
+        }
+    });
+    
+    btn.classList.toggle('active', showPoints);
+    btn.textContent = showPoints ? '🔘 Hide Points' : '⚪ Show Points';
+}
+
+function toggleLabels() {
+    showLabels = !showLabels;
+    const btn = document.getElementById('toggleLabelsBtn');
+    
+    allPointMarkers.forEach(marker => {
+        if (showLabels) {
+            marker.openPopup();
+        } else {
+            marker.closePopup();
+        }
+    });
+    
+    btn.classList.toggle('active', showLabels);
+    btn.textContent = showLabels ? '🏷️ Hide Labels' : '🏷️ Show Labels';
+}
+
 // ================= SHOW MESSAGE =================
 function showMessage(message, type) {
     const existingMsg = document.querySelector('.error-message, .info-message');
@@ -290,7 +371,7 @@ function showMessage(message, type) {
     const msgDiv = document.createElement('div');
     msgDiv.className = type === 'error' ? 'error-message' : 'info-message';
     msgDiv.innerHTML = message;
-    msgDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 400px; padding: 12px 20px; border-radius: 8px;';
+    msgDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 400px; padding: 12px 20px; border-radius: 8px; background: ' + (type === 'error' ? '#fc8181' : '#4299e1') + '; color: white;';
     
     document.body.appendChild(msgDiv);
     
@@ -360,6 +441,9 @@ function processData(data, filterDate){
     const targetKey = sample.hasOwnProperty('Target (km)') ? 'Target (km)' : 
                       sample.hasOwnProperty('target') ? 'target' : null;
     
+    const timeKey = sample.hasOwnProperty('Time') ? 'Time' : 
+                    sample.hasOwnProperty('time') ? 'time' : null;
+    
     const dateKey = sample.hasOwnProperty('Date') ? 'Date' : 
                     sample.hasOwnProperty('date') ? 'date' : null;
     
@@ -377,28 +461,25 @@ function processData(data, filterDate){
     // Calculate statistics
     calculateStats(filtered, distKey, speedKey, targetKey);
     
-    // Render route
-    renderRoute(filtered, latKey, lonKey, distKey);
+    // Render route with points
+    renderRouteWithPoints(filtered, latKey, lonKey, distKey, speedKey, timeKey);
 }
 
 // ================= CALCULATE STATISTICS =================
 function calculateStats(data, distKey, speedKey, targetKey) {
     
-    // Total Distance
     let totalDistance = 0;
     if (distKey && data[data.length-1][distKey]) {
         totalDistance = parseFloat(data[data.length-1][distKey]) || 0;
     }
     document.getElementById('totalDistance').innerHTML = totalDistance.toFixed(2);
     
-    // Target Distance
     let targetDistance = 0;
     if (targetKey && data[0][targetKey]) {
         targetDistance = parseFloat(data[0][targetKey]) || 0;
     }
     document.getElementById('targetDistance').innerHTML = targetDistance.toFixed(1);
     
-    // Max Speed
     let maxSpeed = 0;
     if (speedKey) {
         data.forEach(row => {
@@ -408,7 +489,6 @@ function calculateStats(data, distKey, speedKey, targetKey) {
     }
     document.getElementById('maxSpeed').innerHTML = maxSpeed.toFixed(1);
     
-    // Average Speed (only count non-zero speeds)
     let totalSpeed = 0;
     let speedCount = 0;
     if (speedKey) {
@@ -423,30 +503,33 @@ function calculateStats(data, distKey, speedKey, targetKey) {
     const avgSpeed = speedCount > 0 ? totalSpeed / speedCount : 0;
     document.getElementById('avgSpeed').innerHTML = avgSpeed.toFixed(1);
     
-    // Duration (assuming ~5 second intervals between points)
     const durationSeconds = (data.length - 1) * 5;
     const durationMinutes = Math.floor(durationSeconds / 60);
     document.getElementById('duration').innerHTML = durationMinutes;
     
-    // Data Points
     document.getElementById('dataPoints').innerHTML = data.length;
 }
 
-// ================= RENDER ROUTE =================
-function renderRoute(data, latK, lonK, distK){
+// ================= RENDER ROUTE WITH POINTS =================
+function renderRouteWithPoints(data, latK, lonK, distK, speedK, timeK){
     
     let points = [];
-    let distances = [];
+    let pointsData = [];
     
-    data.forEach(row=>{
+    data.forEach((row, index) => {
         const lat = Number(row[latK]);
         const lon = Number(row[lonK]);
         
         if(!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0){
             points.push([lat, lon]);
-            if (distK) {
-                distances.push(parseFloat(row[distK]) || 0);
-            }
+            pointsData.push({
+                index: index + 1,
+                lat: lat,
+                lon: lon,
+                distance: distK ? parseFloat(row[distK]) || 0 : 0,
+                speed: speedK ? parseFloat(row[speedK]) || 0 : 0,
+                time: timeK ? row[timeK] : 'N/A'
+            });
         }
     });
     
@@ -454,6 +537,10 @@ function renderRoute(data, latK, lonK, distK){
     if(routeLine) map.removeLayer(routeLine);
     if(startMarker) map.removeLayer(startMarker);
     if(endMarker) map.removeLayer(endMarker);
+    
+    // Clear all point markers
+    allPointMarkers.forEach(marker => marker.remove());
+    allPointMarkers = [];
     
     if(points.length === 0){
         showMessage("No valid GPS points found", "error");
@@ -464,42 +551,92 @@ function renderRoute(data, latK, lonK, distK){
     routeLine = L.polyline(points,{
         color: "#667eea",
         weight: 4,
-        opacity: 0.8
+        opacity: 0.7
     }).addTo(map);
     
-    // Custom start marker
-    const startIcon = L.divIcon({
-        html: '<div style="font-size: 24px;">🏁</div>',
-        iconSize: [30, 30],
-        className: 'custom-marker'
+    // ===== CREATE MARKER FOR EACH GPS POINT =====
+    pointsData.forEach((point, idx) => {
+        // Create popup content
+        const popupContent = `
+            <div style="min-width: 150px;">
+                <b>📍 Point #${point.index}</b><br>
+                📍 Lat: ${point.lat.toFixed(6)}<br>
+                📍 Lon: ${point.lon.toFixed(6)}<br>
+                📏 Distance: ${point.distance.toFixed(3)} km<br>
+                ⚡ Speed: ${point.speed.toFixed(1)} km/h<br>
+                ⏱️ Time: ${point.time}<br>
+                ${idx === 0 ? '🏁 START POINT' : idx === pointsData.length-1 ? '🏆 END POINT' : ''}
+            </div>
+        `;
+        
+        // Different marker for start/end vs middle points
+        let marker;
+        if (idx === 0) {
+            // Start marker
+            const startIcon = L.divIcon({
+                html: '<div style="font-size: 20px;">🏁</div>',
+                iconSize: [25, 25],
+                className: 'gps-marker'
+            });
+            marker = L.marker([point.lat, point.lon], { icon: startIcon });
+        } 
+        else if (idx === pointsData.length-1) {
+            // End marker
+            const endIcon = L.divIcon({
+                html: '<div style="font-size: 20px;">🏆</div>',
+                iconSize: [25, 25],
+                className: 'gps-marker'
+            });
+            marker = L.marker([point.lat, point.lon], { icon: endIcon });
+        }
+        else {
+            // Regular point marker - small colored dot
+            const pointIcon = L.divIcon({
+                html: '<div style="width: 8px; height: 8px; background: #667eea; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>',
+                iconSize: [12, 12],
+                className: 'point-marker'
+            });
+            marker = L.marker([point.lat, point.lon], { icon: pointIcon });
+        }
+        
+        marker.bindPopup(popupContent);
+        
+        // Color-code based on speed (optional - shows speed zones)
+        if (point.speed > 0 && idx !== 0 && idx !== pointsData.length-1) {
+            let color;
+            if (point.speed < 3) color = '#48bb78';      // Green - slow
+            else if (point.speed < 6) color = '#ecc94b'; // Yellow - medium
+            else color = '#fc8181';                       // Red - fast
+            
+            const speedIcon = L.divIcon({
+                html: `<div style="width: 10px; height: 10px; background: ${color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
+                iconSize: [14, 14],
+                className: 'point-marker'
+            });
+            marker.setIcon(speedIcon);
+        }
+        
+        marker.addTo(map);
+        allPointMarkers.push(marker);
+        
+        // Auto-show labels if enabled
+        if (showLabels) {
+            marker.openPopup();
+        }
     });
-    startMarker = L.marker(points[0], { icon: startIcon })
-        .addTo(map)
-        .bindPopup('<b>Start Point</b><br>Begin your journey');
     
-    // Custom end marker
-    const endIcon = L.divIcon({
-        html: '<div style="font-size: 24px;">🏆</div>',
-        iconSize: [30, 30],
-        className: 'custom-marker'
-    });
-    endMarker = L.marker(points[points.length-1], { icon: endIcon })
-        .addTo(map)
-        .bindPopup('<b>End Point</b><br>Journey completed');
-    
-    // Add distance markers at key points
-    if (distances.length > 0) {
-        const step = Math.floor(points.length / 5);
-        for (let i = step; i < points.length - 1; i += step) {
-            if (distances[i] > 0) {
-                const waypointIcon = L.divIcon({
-                    html: `<div style="font-size: 16px; background: white; border-radius: 50%; padding: 4px;">📍</div>`,
-                    iconSize: [25, 25]
-                });
-                L.marker(points[i], { icon: waypointIcon })
-                    .addTo(map)
-                    .bindPopup(`<b>Waypoint</b><br>Distance: ${distances[i].toFixed(2)} km`);
-            }
+    // Add distance markers at intervals (every 10th point)
+    const interval = Math.max(1, Math.floor(points.length / 10));
+    for (let i = interval; i < points.length - 1; i += interval) {
+        if (pointsData[i] && pointsData[i].distance > 0) {
+            const distIcon = L.divIcon({
+                html: `<div style="background: white; border-radius: 15px; padding: 2px 6px; font-size: 10px; font-weight: bold; border: 1px solid #667eea;">${pointsData[i].distance.toFixed(1)}km</div>`,
+                iconSize: [40, 20],
+                className: 'distance-label'
+            });
+            const distMarker = L.marker([pointsData[i].lat, pointsData[i].lon], { icon: distIcon });
+            distMarker.addTo(map);
+            allPointMarkers.push(distMarker);
         }
     }
     
@@ -507,7 +644,7 @@ function renderRoute(data, latK, lonK, distK){
     const bounds = L.latLngBounds(points);
     map.fitBounds(bounds, { padding: [50, 50] });
     
-    // Force zoom to be at least 15 if bounds are too wide
+    // Ensure zoom is at least 15
     setTimeout(() => {
         const currentZoom = map.getZoom();
         if (currentZoom < 15) {
@@ -516,7 +653,11 @@ function renderRoute(data, latK, lonK, distK){
         map.invalidateSize();
     }, 100);
     
-    showMessage(`✅ Loaded ${points.length} points | Total: ${document.getElementById('totalDistance').innerHTML} km`, "info");
+    showMessage(`✅ Loaded ${points.length} GPS points | Total distance: ${document.getElementById('totalDistance').innerHTML} km`, "info");
+    
+    // Update toggle button text
+    const pointsBtn = document.getElementById('togglePointsBtn');
+    pointsBtn.textContent = showPoints ? '🔘 Hide Points' : '⚪ Show Points';
 }
 
 // ================= SHOW LOADING =================
