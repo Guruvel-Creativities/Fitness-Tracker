@@ -3,175 +3,552 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fitness Tracker</title>
+<title>Fitness Tracker - Route Map</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- ✅ FIXED CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
 <style>
-body { font-family: Arial; background:#f5f5f5; }
-.container { max-width:1200px; margin:auto; }
-#map { height:500px; margin-top:20px; border-radius:10px; }
-#debug { background:#111; color:#0f0; padding:10px; height:150px; overflow:auto; font-size:12px;}
-button { padding:10px; margin:5px; }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    text-align: center;
+    color: white;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+.header p {
+    font-size: 1.1em;
+    opacity: 0.9;
+}
+
+.location-badge {
+    background: rgba(255,255,255,0.2);
+    display: inline-block;
+    padding: 5px 15px;
+    border-radius: 20px;
+    margin-top: 10px;
+    font-size: 0.9em;
+}
+
+.date-selector {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.date-selector label {
+    font-weight: bold;
+    color: #333;
+}
+
+.date-selector input {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.date-selector button {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+    font-size: 14px;
+}
+
+.date-selector button:hover {
+    background: #5a67d8;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card h3 {
+    color: #667eea;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.stat-card .value {
+    font-size: 2em;
+    font-weight: bold;
+    color: #333;
+}
+
+.stat-card .unit {
+    font-size: 0.5em;
+    color: #666;
+}
+
+#map {
+    height: 500px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+/* Custom zoom control position */
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
+
+.leaflet-control-zoom a {
+    background: white !important;
+    color: #667eea !important;
+    font-weight: bold !important;
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: white;
+    font-size: 1.2em;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.8);
+    border-radius: 10px;
+    z-index: 1000;
+}
+
+.error-message {
+    background: #fc8181;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.info-message {
+    background: #4299e1;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.spinner {
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top: 3px solid white;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 10px;
+}
 </style>
 </head>
 
 <body>
 
 <div class="container">
-<h2>Fitness Tracker</h2>
-
-<input type="date" id="dateInput">
-<button onclick="fetchSheetData()">Load Route</button>
-
-<div id="map"></div>
-<div id="debug">> Ready...<br></div>
+    <div class="header">
+        <h1>🏃 Fitness Tracker Route Map</h1>
+        <p>View your running/walking routes on the map</p>
+        <div class="location-badge">
+            📍 Coimbatore, Tamil Nadu, India
+        </div>
+    </div>
+    
+    <div class="date-selector">
+        <label for="dateInput">📅 Select Date:</label>
+        <input type="date" id="dateInput">
+        <button onclick="fetchSheetData()">🗺️ Load Route</button>
+    </div>
+    
+    <div class="stats" id="stats">
+        <div class="stat-card">
+            <h3>Total Distance</h3>
+            <div class="value" id="totalDistance">0</div>
+            <div class="unit">km</div>
+        </div>
+        <div class="stat-card">
+            <h3>Target Distance</h3>
+            <div class="value" id="targetDistance">0</div>
+            <div class="unit">km</div>
+        </div>
+        <div class="stat-card">
+            <h3>Avg Speed</h3>
+            <div class="value" id="avgSpeed">0</div>
+            <div class="unit">km/h</div>
+        </div>
+        <div class="stat-card">
+            <h3>Max Speed</h3>
+            <div class="value" id="maxSpeed">0</div>
+            <div class="unit">km/h</div>
+        </div>
+        <div class="stat-card">
+            <h3>Duration</h3>
+            <div class="value" id="duration">0</div>
+            <div class="unit">min</div>
+        </div>
+        <div class="stat-card">
+            <h3>Data Points</h3>
+            <div class="value" id="dataPoints">0</div>
+            <div class="unit">records</div>
+        </div>
+    </div>
+    
+    <div id="map"></div>
 </div>
 
 <script>
 
 // ================= SETTINGS =================
-
-// ✅ YOUR FINAL WORKING CSV (PUBLISHED)
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWm5aTQ5LCqkYJXMrengrw0ES1RdeT-TurNXTWVejFFmK9rSmt0ekKCY_DnLOS3wDegMU9OOs3w5gc/pub?gid=1576719619&single=true&output=csv";
 
 // ================= GLOBAL =================
 let map, routeLine, startMarker, endMarker;
 
-// ================= LOGGER =================
-function log(msg){
-    const d = document.getElementById("debug");
-    d.innerHTML += "> " + msg + "<br>";
-    d.scrollTop = d.scrollHeight;
-    console.log(msg);
-}
-
-// ================= MAP =================
+// ================= MAP INIT =================
 function initMap(){
-    map = L.map('map').setView([11.0168, 76.9558], 13);
-
+    map = L.map('map').setView([11.0168, 76.9558], 15);
+    
+    // Add zoom control with custom position (top-right is default)
+    L.control.zoom({
+        position: 'topright'
+    }).addTo(map);
+    
+    // Add scale bar
+    L.control.scale({
+        metric: true,
+        imperial: false,
+        position: 'bottomleft'
+    }).addTo(map);
+    
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-        attribution:'© OpenStreetMap'
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
     }).addTo(map);
 }
 
-// ================= FETCH =================
-async function fetchSheetData(){
+// ================= SHOW MESSAGE =================
+function showMessage(message, type) {
+    const existingMsg = document.querySelector('.error-message, .info-message');
+    if (existingMsg) existingMsg.remove();
+    
+    const msgDiv = document.createElement('div');
+    msgDiv.className = type === 'error' ? 'error-message' : 'info-message';
+    msgDiv.innerHTML = message;
+    msgDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 400px; padding: 12px 20px; border-radius: 8px;';
+    
+    document.body.appendChild(msgDiv);
+    
+    setTimeout(() => {
+        msgDiv.remove();
+    }, 5000);
+}
 
+// ================= FETCH DATA =================
+async function fetchSheetData(){
     const filterDate = document.getElementById("dateInput").value;
     if(!filterDate){
-        alert("Select date first");
+        showMessage("Please select a date first", "error");
         return;
     }
-
-    log("Fetching CSV...");
-
+    
+    showLoading(true);
+    
     try{
         const res = await fetch(CSV_URL);
-
+        
         if(!res.ok){
             throw new Error("Sheet not accessible");
         }
-
+        
         const text = await res.text();
-
+        
         Papa.parse(text,{
             header:true,
             skipEmptyLines:true,
             complete:(result)=>{
                 processData(result.data, filterDate);
+                showLoading(false);
             }
         });
-
+        
     }catch(e){
-        log("ERROR: " + e.message);
+        showMessage("Error: " + e.message, "error");
+        showLoading(false);
     }
 }
 
-// ================= PROCESS =================
+// ================= PROCESS DATA =================
 function processData(data, filterDate){
-
+    
     if(!data || data.length === 0){
-        log("No data found");
+        showMessage("No data found", "error");
         return;
     }
-
-    log("Total rows: " + data.length);
-    log("Columns: " + Object.keys(data[0]).join(", "));
-
-    // ✅ FIXED COLUMN NAMES
-    const latKey = "Latitude";
-    const lonKey = "Longitude";
-    const dateKey = "Date";
-
-    // ✅ FILTER DATE
+    
+    // Find correct column names
+    const sample = data[0];
+    const latKey = sample.hasOwnProperty('Latitude') ? 'Latitude' : 
+                   sample.hasOwnProperty('lat') ? 'lat' : 
+                   sample.hasOwnProperty('LAT') ? 'LAT' : null;
+    
+    const lonKey = sample.hasOwnProperty('Longitude') ? 'Longitude' : 
+                   sample.hasOwnProperty('lon') ? 'lon' : 
+                   sample.hasOwnProperty('LON') ? 'LON' : null;
+    
+    const distKey = sample.hasOwnProperty('Distance (km)') ? 'Distance (km)' : 
+                    sample.hasOwnProperty('dist') ? 'dist' : null;
+    
+    const speedKey = sample.hasOwnProperty('Speed (km/h)') ? 'Speed (km/h)' : 
+                     sample.hasOwnProperty('spd') ? 'spd' : null;
+    
+    const targetKey = sample.hasOwnProperty('Target (km)') ? 'Target (km)' : 
+                      sample.hasOwnProperty('target') ? 'target' : null;
+    
+    const dateKey = sample.hasOwnProperty('Date') ? 'Date' : 
+                    sample.hasOwnProperty('date') ? 'date' : null;
+    
+    // Filter by date
     const filtered = data.filter(row=>{
         return String(row[dateKey]).trim() === filterDate;
     });
-
-    log("Filtered rows: " + filtered.length);
-
+    
     if(filtered.length === 0){
-        alert("No data for selected date");
+        showMessage("No data for selected date", "error");
+        showLoading(false);
         return;
     }
-
-    renderRoute(filtered, latKey, lonKey);
+    
+    // Calculate statistics
+    calculateStats(filtered, distKey, speedKey, targetKey);
+    
+    // Render route
+    renderRoute(filtered, latKey, lonKey, distKey);
 }
 
-// ================= RENDER =================
-function renderRoute(data, latK, lonK){
+// ================= CALCULATE STATISTICS =================
+function calculateStats(data, distKey, speedKey, targetKey) {
+    
+    // Total Distance
+    let totalDistance = 0;
+    if (distKey && data[data.length-1][distKey]) {
+        totalDistance = parseFloat(data[data.length-1][distKey]) || 0;
+    }
+    document.getElementById('totalDistance').innerHTML = totalDistance.toFixed(2);
+    
+    // Target Distance
+    let targetDistance = 0;
+    if (targetKey && data[0][targetKey]) {
+        targetDistance = parseFloat(data[0][targetKey]) || 0;
+    }
+    document.getElementById('targetDistance').innerHTML = targetDistance.toFixed(1);
+    
+    // Max Speed
+    let maxSpeed = 0;
+    if (speedKey) {
+        data.forEach(row => {
+            const speed = parseFloat(row[speedKey]) || 0;
+            if (speed > maxSpeed) maxSpeed = speed;
+        });
+    }
+    document.getElementById('maxSpeed').innerHTML = maxSpeed.toFixed(1);
+    
+    // Average Speed (only count non-zero speeds)
+    let totalSpeed = 0;
+    let speedCount = 0;
+    if (speedKey) {
+        data.forEach(row => {
+            const speed = parseFloat(row[speedKey]) || 0;
+            if (speed > 0) {
+                totalSpeed += speed;
+                speedCount++;
+            }
+        });
+    }
+    const avgSpeed = speedCount > 0 ? totalSpeed / speedCount : 0;
+    document.getElementById('avgSpeed').innerHTML = avgSpeed.toFixed(1);
+    
+    // Duration (assuming ~5 second intervals between points)
+    const durationSeconds = (data.length - 1) * 5;
+    const durationMinutes = Math.floor(durationSeconds / 60);
+    document.getElementById('duration').innerHTML = durationMinutes;
+    
+    // Data Points
+    document.getElementById('dataPoints').innerHTML = data.length;
+}
 
+// ================= RENDER ROUTE =================
+function renderRoute(data, latK, lonK, distK){
+    
     let points = [];
-
+    let distances = [];
+    
     data.forEach(row=>{
         const lat = Number(row[latK]);
         const lon = Number(row[lonK]);
-
-        if(!isNaN(lat) && !isNaN(lon)){
+        
+        if(!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0){
             points.push([lat, lon]);
+            if (distK) {
+                distances.push(parseFloat(row[distK]) || 0);
+            }
         }
     });
-
-    log("Valid points: " + points.length);
-
-    // CLEAR OLD
+    
+    // Clear old layers
     if(routeLine) map.removeLayer(routeLine);
     if(startMarker) map.removeLayer(startMarker);
     if(endMarker) map.removeLayer(endMarker);
-
+    
     if(points.length === 0){
-        log("No valid GPS points");
+        showMessage("No valid GPS points found", "error");
         return;
     }
-
-    // DRAW ROUTE
+    
+    // Draw route line
     routeLine = L.polyline(points,{
-        color:"blue",
-        weight:5
+        color: "#667eea",
+        weight: 4,
+        opacity: 0.8
     }).addTo(map);
+    
+    // Custom start marker
+    const startIcon = L.divIcon({
+        html: '<div style="font-size: 24px;">🏁</div>',
+        iconSize: [30, 30],
+        className: 'custom-marker'
+    });
+    startMarker = L.marker(points[0], { icon: startIcon })
+        .addTo(map)
+        .bindPopup('<b>Start Point</b><br>Begin your journey');
+    
+    // Custom end marker
+    const endIcon = L.divIcon({
+        html: '<div style="font-size: 24px;">🏆</div>',
+        iconSize: [30, 30],
+        className: 'custom-marker'
+    });
+    endMarker = L.marker(points[points.length-1], { icon: endIcon })
+        .addTo(map)
+        .bindPopup('<b>End Point</b><br>Journey completed');
+    
+    // Add distance markers at key points
+    if (distances.length > 0) {
+        const step = Math.floor(points.length / 5);
+        for (let i = step; i < points.length - 1; i += step) {
+            if (distances[i] > 0) {
+                const waypointIcon = L.divIcon({
+                    html: `<div style="font-size: 16px; background: white; border-radius: 50%; padding: 4px;">📍</div>`,
+                    iconSize: [25, 25]
+                });
+                L.marker(points[i], { icon: waypointIcon })
+                    .addTo(map)
+                    .bindPopup(`<b>Waypoint</b><br>Distance: ${distances[i].toFixed(2)} km`);
+            }
+        }
+    }
+    
+    // Fit map bounds with padding
+    const bounds = L.latLngBounds(points);
+    map.fitBounds(bounds, { padding: [50, 50] });
+    
+    // Force zoom to be at least 15 if bounds are too wide
+    setTimeout(() => {
+        const currentZoom = map.getZoom();
+        if (currentZoom < 15) {
+            map.setZoom(15);
+        }
+        map.invalidateSize();
+    }, 100);
+    
+    showMessage(`✅ Loaded ${points.length} points | Total: ${document.getElementById('totalDistance').innerHTML} km`, "info");
+}
 
-    // START & END MARKERS
-    startMarker = L.marker(points[0]).addTo(map).bindPopup("Start");
-    endMarker = L.marker(points[points.length-1]).addTo(map).bindPopup("End");
-
-    map.fitBounds(routeLine.getBounds(), {padding:[50,50]});
-
-    setTimeout(()=>map.invalidateSize(),500);
-
-    log("Route rendered successfully");
+// ================= SHOW LOADING =================
+function showLoading(show) {
+    let loadingDiv = document.getElementById('loading');
+    if (show) {
+        if (!loadingDiv) {
+            const div = document.createElement('div');
+            div.id = 'loading';
+            div.className = 'loading';
+            div.innerHTML = '<div class="spinner"></div>Loading route data...';
+            document.body.appendChild(div);
+        } else {
+            loadingDiv.style.display = 'block';
+        }
+    } else if (loadingDiv) {
+        loadingDiv.style.display = 'none';
+    }
 }
 
 // ================= INIT =================
-window.onload = ()=>{
+window.onload = () => {
     initMap();
-
-    document.getElementById("dateInput").value =
-        new Date().toISOString().split('T')[0];
+    
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("dateInput").value = today;
+    
+    // Auto-load today's data
+    setTimeout(() => {
+        fetchSheetData();
+    }, 500);
 };
 
 </script>
